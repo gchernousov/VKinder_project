@@ -40,9 +40,9 @@ class Server:
 
     def start_conversation(self, user_id):
         msg = "Хотите начать поиск людей для знакомств?"
-        keyboard = VkKeyboard(one_time=False)
-        keyboard.add_button(label="ДА", color=VkKeyboardColor.POSITIVE)
-        keyboard.add_button(label="НЕТ", color=VkKeyboardColor.NEGATIVE)
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button(label="Да", color=VkKeyboardColor.POSITIVE)
+        keyboard.add_button(label="Нет", color=VkKeyboardColor.NEGATIVE)
         self.send_msg(user_id, msg, keyboard)
 
     def start(self):
