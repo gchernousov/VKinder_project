@@ -3,9 +3,11 @@ from config import token
 
 from pprint import pprint as pp
 
+GROUP_ID = 214337223
+
 if __name__ == "__main__":
 
-    server = Server(token, 214337223, "Server")
+    server = Server(token, GROUP_ID, "VKinder server")
 
     # server.send_msg(716417153, "test message")
 

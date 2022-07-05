@@ -1,8 +1,10 @@
 from random import randrange
 from pprint import pprint as pp
+import re
 
 import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
+from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
 
 class Server:
@@ -13,38 +15,41 @@ class Server:
         self.long_poll = VkBotLongPoll(self.vk, group_id)
         self.vk_api = self.vk.get_api()
 
-    def send_msg(self, send_id, message):
-        self.vk_api.messages.send(peer_id=send_id, message=message, random_id=randrange(10 ** 7))
+    def send_msg(self, user_id: int, message: str, keyboard=None):
+        """Отправка сообщения пользователю"""
+        self.vk_api.messages.send(peer_id=user_id, message=message,
+                                  keyboard=keyboard.get_keyboard(), random_id=randrange(10 ** 7))
 
-    def start(self):
-        for event in self.long_poll.listen():
-            if event.type == VkBotEventType.MESSAGE_NEW:
-                answer_data = self.get_answer(event)
-                if answer_data[1] == "Привет":
-                    message = f"Привет, {self.get_user_name(answer_data[0])}!"
-                    self.send_msg(answer_data[0], message)
-
-                question = "Хотите найти кого-нибудь для знакомства?"
-                self.send_msg(answer_data[0], question)
-
-
-                # print("Username: " + self.get_user_name(event.object.from_id))
-                # print("From: " + self.get_user_city(event.object.from_id))
-                # print("Text: " + event.object.text)
-                # print("Type: ", end="")
-                # if event.object.id > 0:
-                #     print("private message")
-                # else:
-                #     print("group message")
-                # print(" --- ")
-
-    def get_user_name(self, user_id):
+    def get_user_name(self, user_id) -> str:
+        """Узнаем имя пользователя"""
         return self.vk_api.users.get(user_id=user_id)[0]['first_name']
 
-    def get_user_city(self, user_id):
-        return self.vk_api.users.get(user_id=user_id, fields="city")[0]["city"]['title']
-
-    def get_answer(self, event):
+    def analys_incoming_message(self, event) -> tuple:
+        """Анализируем сообщение и узнаем id пользователя и текст его сообщения"""
         user_id = event.object.message['from_id']
         text_message = event.object.message['text']
         return user_id, text_message
+
+    def say_hello(self, user_id_and_text: tuple):
+        pattern = r"[П/п]ривет|[З|з]дравствуй[\w]*|[H|h]ello|[Х|х]ай|[Д|д]оброе утро|[Д|д]обрый [день|вечер]+ "
+        result = re.findall(pattern, user_id_and_text[1])
+        if len(result) != 0:
+            user_name = self.get_user_name(user_id_and_text[0])
+            msg = f"Привет, {user_name}"
+            self.send_msg(user_id_and_text[0], msg)
+
+    def start_conversation(self, user_id):
+        msg = "Хотите начать поиск людей для знакомств?"
+        keyboard = VkKeyboard(one_time=False)
+        keyboard.add_button(label="ДА", color=VkKeyboardColor.POSITIVE)
+        keyboard.add_button(label="НЕТ", color=VkKeyboardColor.NEGATIVE)
+        self.send_msg(user_id, msg, keyboard)
+
+    def start(self):
+        """ Функция диалога с пользователем"""
+        for event in self.long_poll.listen():
+            if event.type == VkBotEventType.MESSAGE_NEW:
+                user_id_and_text = self.analys_incoming_message(event)
+                user_id = user_id_and_text[0]
+                self.say_hello(user_id_and_text)
+                self.start_conversation(user_id)
