@@ -1,6 +1,8 @@
 from random import randrange
 from pprint import pprint as pp
 import re
+import json
+import datetime
 
 import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
@@ -23,9 +25,10 @@ class Server:
         else:
             self.vk_api.messages.send(peer_id=user_id, message=message, random_id=randrange(10 ** 7))
 
-    def get_user_name(self, user_id) -> str:
-        """Узнаем имя пользователя"""
-        return self.vk_api.users.get(user_id=user_id)[0]['first_name']
+    def delete_buttons(self, user_id, message):
+        kb = {"one_time": True, "buttons": []}
+        self.vk_api.messages.send(peer_id=user_id, message=message,
+                                  keyboard=json.dumps(kb), random_id=randrange(10 ** 7))
 
     def analys_event_message_new(self, event) -> tuple:
         """Анализируем сообщение и узнаем id пользователя и текст его сообщения"""
@@ -33,34 +36,86 @@ class Server:
         text_message = event.object.message['text']
         return user_id, text_message
 
-    def analys_event_message_event(self, event):
-        user_id = event.object['user_id']
-        event_id = event.object['event_id']
-        # self.vk_api.messages.sendMessageEventAnswer(event_id=event_id, user_id=user_id,
-        #                                             peer_id=user_id, event_data="1111")
-        return user_id, event_id
-
     def say_hello(self, user_id_and_text: tuple):
+        """Ищем приветствие в сообщении. Если оно есть - приветствуем пользователя в ответ"""
         pattern = r"[П/п]ривет|[З|з]дравствуй[\w]*|[H|h]ello|[Х|х]ай|[Д|д]обр[а-я]+ (утро|день|вечер)"
         result = re.findall(pattern, user_id_and_text[1])
         if len(result) != 0:
-            user_name = self.get_user_name(user_id_and_text[0])
+            user_name = self.vk_api.users.get(user_id=user_id_and_text[0])[0]['first_name']
             msg = f"Привет, {user_name}"
-            # kb = VkKeyboard(one_time=True)
             self.send_msg(user_id_and_text[0], msg)
 
     def start_conversation(self, user_id):
         msg = "Хотите начать поиск людей для знакомств?"
         keyboard = VkKeyboard(one_time=True)
-        # keyboard.add_button(label="Да", color=VkKeyboardColor.POSITIVE)
-        # keyboard.add_button(label="Нет", color=VkKeyboardColor.NEGATIVE)
-        # keyboard.add_callback_button(label="КНОПКА 1", payload={'type': 'show_snackbar', 'text': 'Я текст в вспылающем окне'}, color=VkKeyboardColor.PRIMARY)
-        # keyboard.add_callback_button(label="КНОПКА 2", payload={'type': 'open_link', 'link': 'https://www.ozon.ru/'}, color=VkKeyboardColor.SECONDARY)
-        keyboard.add_callback_button(label="Да", color=VkKeyboardColor.POSITIVE, payload={"type": "press_YES"})
-        keyboard.add_callback_button(label="Нет", color=VkKeyboardColor.NEGATIVE, payload={"type": "press_NO"})
-        # self.vk_api.messages.sendMessageEventAnswer(peer_id=user_id, message=msg,
-        #                           keyboard=keyboard.get_keyboard(), random_id=randrange(10 ** 7))
+        keyboard.add_callback_button(label="Да", color=VkKeyboardColor.POSITIVE, payload={"type": "get_info_for_search"})
+        keyboard.add_callback_button(label="Нет", color=VkKeyboardColor.NEGATIVE, payload={"type": "no_search"})
         self.send_msg(user_id, msg, keyboard)
+
+    def start_seacrh_person(self):
+        pass
+
+    def get_user_info(self, user_id):
+        """Собираем информацию о пользователе"""
+        result = self.vk_api.users.get(user_id=user_id, fields="bdate,city,relation,sex")
+        if "bdate" in result[0]:
+            user_birthday = result[0]["bdate"]
+            age = self.get_age(user_birthday)
+        else:
+            age = None
+        if "city" in result[0]:
+            city = result[0]["city"]
+        else:
+            city = None
+        user_info = {"user_id": result[0]["id"],
+                     "first_name": result[0]["first_name"],
+                     "last_name": result[0]["last_name"],
+                     "age": age,
+                     "city": city,
+                     "relation": result[0]["relation"],
+                     "gender": result[0]["sex"]}
+        return user_info
+
+    def get_age(self, birthday):
+        """Узнаем сколько пользователю полных лет"""
+        current_date = datetime.date.today()
+        now = datetime.date(year=current_date.year, month=current_date.month, day=current_date.day)
+        birthday = birthday.split(".")
+        bday = datetime.date(year=int(birthday[2]), month=int(birthday[1]), day=int(birthday[0]))
+        age = int((now - bday).days / 365)
+        return age
+
+    def ask_user_age(self, user_id):
+        question = "Сколько вам лет?"
+        self.send_msg(user_id, question)
+
+    def ask_user_for_search(self, user_info):
+        who = ""
+        city = ""
+        if user_info["gender"] == 1:
+            who = "парня"
+        elif user_info["gender"] == 2:
+            who = "девушку"
+        else:
+            pass # уточнить у пользователя пол
+        if user_info["age"] is None:
+            pass # спросить возраст
+            # self.ask_user_age(user_info["user_id"])
+        if user_info["city"] is None:
+            pass # уточнить город
+        else:
+            city = user_info["city"]["title"]
+
+        message = f"{user_info['first_name']}, будем искать {who} в возрасте {user_info['age']} лет из г. {city}, верно?"
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_callback_button(label="Да", color=VkKeyboardColor.POSITIVE,
+                                     payload={"type": "start_search"})
+        keyboard.add_callback_button(label="Нет", color=VkKeyboardColor.NEGATIVE,
+                                     payload={"type": "get_new_info_for_search"})
+        keyboard.add_line()
+        keyboard.add_callback_button(label="Стоп! Я передумал", color=VkKeyboardColor.SECONDARY,
+                                     payload={"type": "stop"})
+        self.send_msg(user_info["user_id"], message, keyboard)
 
     def start(self):
         """ Функция диалога с пользователем"""
@@ -71,12 +126,22 @@ class Server:
                 self.say_hello(user_id_and_text)
                 self.start_conversation(user_id)
             elif event.type == VkBotEventType.MESSAGE_EVENT:
-                user_id_and_event_id = self.analys_event_message_event(event)
-                if event.object.payload.get("type") == "press_YES":
-                    new_msg = "Начать поиск людей..."
-                    self.send_msg(user_id_and_event_id[0], new_msg)
-                elif event.object.payload.get("type") == "press_NO":
-                    new_msg = "Нет, так нет. Как-нибудь в другой раз. До скорой встречи!"
-                    kb = VkKeyboard(one_time=True)
-                    kb.add_button(label="EXIT", color=VkKeyboardColor.NEGATIVE)
-                    self.send_msg(user_id_and_event_id[0], new_msg, kb)
+                user_id = event.object['user_id']
+                if event.object.payload.get("type") == "get_info_for_search":
+                    user_info = self.get_user_info(user_id)
+                    self.ask_user_for_search(user_info)
+                    # new_message = "Начинается работа функции start_search_person()"
+                    # # self.vk_api.messages.send(peer_id=user_id, message=new_message, random_id=randrange(10 ** 7))
+                    # self.send_msg(user_id, new_message)
+                elif event.object.payload.get("type") == "no_search":
+                    new_message = "Нет, так нет. Как-нибудь в другой раз. До скорой встречи!"
+                    self.delete_buttons(user_id, new_message)
+                elif event.object.payload.get("type") == "stop":
+                    new_message = "Очень жаль. Когда передумаете еще раз, обращайтесь!"
+                    self.delete_buttons(user_id, new_message)
+                elif event.object.payload.get("type") == "start_search":
+                    new_message = "[начинаем поиск людей по заданным параметрам: search_person()]"
+                    self.send_msg(user_id, new_message)
+                elif event.object.payload.get("type") == "get_new_info_for_search":
+                    new_message = "[сбор новых параметров для поиска людей: new_search_options()]"
+                    self.send_msg(user_id, new_message)

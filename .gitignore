@@ -1,1 +1,5 @@
 /other_stuff
+/__pycache__
+
+test_unittest.py
+test_vk_api.py
