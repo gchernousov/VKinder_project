@@ -9,11 +9,12 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
 from search_people import test_search_results
+from Database import Postgresql
 
 
 class Server:
 
-    def __init__(self, api_token, group_id, server_name: str="Empty"):
+    def __init__(self, api_token, group_id, server_name: str = "Empty"):
         self.server_name = server_name
         self.vk = vk_api.VkApi(token=api_token)
         self.long_poll = VkBotLongPoll(self.vk, group_id)
@@ -23,7 +24,7 @@ class Server:
         """Отправка сообщения пользователю"""
         if keyboard != None:
             self.vk_api.messages.send(peer_id=user_id, message=message,
-                                  keyboard=keyboard.get_keyboard(), random_id=randrange(10 ** 7))
+                                      keyboard=keyboard.get_keyboard(), random_id=randrange(10 ** 7))
         else:
             self.vk_api.messages.send(peer_id=user_id, message=message, random_id=randrange(10 ** 7))
 
@@ -31,7 +32,7 @@ class Server:
         """Отправка фотографий пользователю"""
         if keyboard != None:
             self.vk_api.messages.send(peer_id=user_id, attachment=img,
-                                  keyboard=keyboard.get_keyboard(), random_id=randrange(10 ** 7))
+                                      keyboard=keyboard.get_keyboard(), random_id=randrange(10 ** 7))
         else:
             self.vk_api.messages.send(peer_id=user_id, attachment=img, random_id=randrange(10 ** 7))
 
@@ -58,7 +59,7 @@ class Server:
         keyboard.add_callback_button(label="Нет", color=VkKeyboardColor.PRIMARY, payload={"type": "no_search"})
         keyboard.add_line()
         keyboard.add_callback_button(label="Понравившиеся", color=VkKeyboardColor.SECONDARY,
-                               payload={"type": "show_favorites"})
+                                     payload={"type": "show_favorites"})
         self.send_msg(user_id, message, keyboard)
 
     def start_seacrh_person(self):
@@ -68,14 +69,16 @@ class Server:
         """Собираем информацию о пользователе"""
         result = self.vk_api.users.get(user_id=user_id, fields="bdate,city,relation,sex")
         # Получаем информацию о дне рождении, городе, статусе отношений и пол
-
+        db = Postgresql()
+        if not db.query(f"SELECT id FROM initiators WHERE id = {user_id}"):
+            db.insert_initiator(user_id)
         if "bdate" in result[0]:
             user_birthday = result[0]["bdate"]
             age = self.get_age(user_birthday)
         else:
             age = "не указан"
         if "city" in result[0]:
-            city = result[0]["city"] # city - словарь, где ключи id и title
+            city = result[0]["city"]  # city - словарь, где ключи id и title
         else:
             city = "не указан"
         if result[0]["sex"] == 0:
@@ -84,7 +87,7 @@ class Server:
             gender = result[0]["sex"]
 
         user_info = {"user_id": user_id, "first_name": result[0]["first_name"], "last_name": result[0]["last_name"],
-                     "age": age, "city": city, "relation": result[0]["relation"], "gender": gender}
+                     "age": age, "city": city, "gender": gender}
         return user_info
 
     def get_age(self, birthday: str) -> int:
@@ -103,11 +106,11 @@ class Server:
                             f"Город: {user_info['city']}" \
                             f"Пол: {user_info['gender']}" \
                             f"Увы, но без полной информации нельзя будет продолжить поиск."
-            self.send_msg(user_nfo['user_id'], error_message)
+            self.send_msg(user_info['user_id'], error_message)
             user_info_data = False
         else:
             user_info_data = True
-        return  user_info_data
+        return user_info_data
 
     def ask_age(self, user_id: int) -> int:
         """Запрашиваем возраст людей, которых будем искать"""
@@ -182,7 +185,6 @@ class Server:
         search_parameters = {"age": age, "gender": gender, "city": city}
         return search_parameters
 
-
     def buttons_like_dislike(self) -> object:
         """Кнопки LIKE, DISLIKE и STOP для показа результатов поиска пользователю"""
         keyboard = VkKeyboard(one_time=True)
@@ -199,9 +201,9 @@ class Server:
         # result = {"id": id, "first_name": first_name, "last_name": last_name, "profile": link, "photos": photos str}
 
         # for result in search_result:
-            # проверяем, есть ли id человека в базе лайков и дизлайков у текущего юзера
-            # да - пропускаем, берем слудующий
-            # нет, добавляем в people[]
+        # проверяем, есть ли id человека в базе лайков и дизлайков у текущего юзера
+        # да - пропускаем, берем слудующий
+        # нет, добавляем в people[]
 
         favorites = []
         black_list = []
@@ -209,54 +211,71 @@ class Server:
         # тестовые данные:
         photos = "photo716417153_457239020,photo716417153_457239018,photo716417153_457239019"
         show = True
+        db = Postgresql()
         for result in test_search_results:
-            if show == True:
-                result_msg = f"{result['first_name']} {result['last_name']}\nпрофиль: {result['profile']}"
-                self.delete_buttons(user_id, result_msg)
-                keyboard = self.buttons_like_dislike()
-                self.send_img(user_id, photos, keyboard)
-                for event in self.long_poll.listen():
-                    if event.type == VkBotEventType.MESSAGE_NEW:
-                        user_text = event.object.message['text']
-                        if user_text == "LIKE":
-                            favorites.append(result)
-                            break
-                        elif user_text == "DISLIKE":
-                            black_list.append(result)
-                            break
-                        elif user_text == "Стоп! Хватит!":
-                            goodbye_msg = "Хорошо, до новых встреч!"
-                            self.delete_buttons(user_id, goodbye_msg)
-                            favorites_message = "Хотите еще раз взглянуть на тех, кто вам понравился?"
-                            kb = VkKeyboard(one_time=True)
-                            kb.add_callback_button(label="Да", color=VkKeyboardColor.SECONDARY,
-                                                   payload={"type": "show_favorites"})
-                            kb.add_line()
-                            kb.add_callback_button(label="Нет", color=VkKeyboardColor.SECONDARY,
-                                                   payload={"type": "no_search"})
-                            self.send_msg(user_id, favorites_message, kb)
-                            show = False
-                            break
-            else:
-                break
+            if not db.query(f"SELECT id FROM founds WHERE id = {result['id']}"):
+                db.insert_found(result)
+                if show == True:
+                    result_msg = f"{result['first_name']} {result['last_name']}\nпрофиль: {result['profile']}"
+                    self.delete_buttons(user_id, result_msg)
+                    keyboard = self.buttons_like_dislike()
+                    self.send_img(user_id, photos, keyboard)
+                    for event in self.long_poll.listen():
+                        if event.type == VkBotEventType.MESSAGE_NEW:
+                            user_text = event.object.message['text']
+                            if user_text == "LIKE":
+                                db.insert_favourite(user_id, result['id'])
+                                # favorites.append(result)
+                                break
+                            elif user_text == "DISLIKE":
+                                db.insert_dislike(user_id, result['id'])
+                                # black_list.append(result)
+                                break
+                            elif user_text == "Стоп! Хватит!":
+                                goodbye_msg = "Хорошо, до новых встреч!"
+                                self.delete_buttons(user_id, goodbye_msg)
+                                favorites_message = "Хотите еще раз взглянуть на тех, кто вам понравился?"
+                                kb = VkKeyboard(one_time=True)
+                                kb.add_callback_button(label="Да", color=VkKeyboardColor.SECONDARY,
+                                                       payload={"type": "show_favorites"})
+                                kb.add_line()
+                                kb.add_callback_button(label="Нет", color=VkKeyboardColor.SECONDARY,
+                                                       payload={"type": "no_search"})
+                                self.send_msg(user_id, favorites_message, kb)
+                                show = False
+                                break
+                else:
+                    break
         # либо список результатов закончился, либо пользователь остановил показ
         # если показ остановлен, т.е. если show False: мы должны обновить базу лайков и дизлайков текущего пользователя
         # если show True, то нужно получить новые (следующий массив) результаты и снова показывать их
         # new_result = vk_search_people
         # show_results(new_results)
-        return favorites
+        # return favorites
 
-    def show_favorites(self, user_id: int, favorites):
-        if len(favorites) == 0:
+    # def show_favorites(self, user_id: int, favorites):
+    #     if len(favorites) == 0:
+    #         message = "Увы, список понравившихся людей пуст.\nМожет быть стоит сначала кого-нибудь найти и посмотреть?"
+    #         self.delete_buttons(user_id, message)
+    #     else:
+    #         message = "Понравившиеся:"
+    #         self.delete_buttons(user_id, message)
+    #         for person in favorites:
+    #             person_info = f"{person['first_name']} {person['last_name']}: {person['profile']}"
+    #             self.send_msg(user_id, person_info)
+
+    def show_favorites(self, user_id: int):
+        db = Postgresql()
+        select = f"SELECT id, first_name, last_name, profile FROM founds JOIN favourites f ON founds.id = f.found_id WHERE f.initiator_id = {user_id}"
+        if not db.query(select):
             message = "Увы, список понравившихся людей пуст.\nМожет быть стоит сначала кого-нибудь найти и посмотреть?"
             self.delete_buttons(user_id, message)
         else:
             message = "Понравившиеся:"
             self.delete_buttons(user_id, message)
-            for person in favorites:
-                person_info = f"{person['first_name']} {person['last_name']}: {person['profile']}"
+            for person in db.query(select):
+                person_info = f"{person[1]} {person[2]}: {person[3]}"
                 self.send_msg(user_id, person_info)
-
 
     def start(self):
         """Отслеживаем события в чате, общаемся с пользователем"""
@@ -287,13 +306,13 @@ class Server:
                     new_message = "Отлично, погнали!"
                     self.delete_buttons(user_id, new_message)
                     # search_result = vk_search_people(search_parameters)
-                    search_result = None # убрать, для теста
+                    search_result = None  # убрать, для теста
                     favorites = self.show_results(user_id, search_result)
                 elif event.object.payload.get("type") == "get_new_info_for_search":
                     search_parameters = self.get_new_info_for_search(user_id)
                     # search_result = vk_search_people(search_parameters)
-                    search_result = None # убрать, для теста
+                    search_result = None  # убрать, для теста
                     favorites = self.show_results(user_id, search_result)
                 elif event.object.payload.get("type") == "show_favorites":
                     # показать список лайков
-                    self.show_favorites(user_id, favorites)
+                    self.show_favorites(user_id)

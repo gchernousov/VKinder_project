@@ -12,8 +12,31 @@ class Postgresql:
         )
         self.cursor = self.con.cursor()
 
-    def create_insert(self, query_text):
-        self.cursor.execute(query_text)
+    def create_tables(self):
+        self.cursor.execute("""
+        CREATE TABLE initiators (id INTEGER PRIMARY KEY);
+        CREATE TABLE founds (id INTEGER PRIMARY KEY, first_name VARCHAR(40), last_name VARCHAR(40), profile VARCHAR(40));
+        CREATE TABLE favourites (initiator_id INTEGER REFERENCES initiators(id), found_id INTEGER REFERENCES founds(id),
+        CONSTRAINT pk2 PRIMARY KEY (initiator_id, found_id));
+        CREATE TABLE disliked (initiator_id INTEGER REFERENCES initiators(id), found_id INTEGER REFERENCES founds(id),
+        CONSTRAINT pk3 PRIMARY KEY (initiator_id, found_id));
+        """)
+        self.con.commit()
+
+    def insert_initiator(self, user_id):
+        self.cursor.execute(f"INSERT INTO initiators VALUES ({user_id})")
+        self.con.commit()
+
+    def insert_found(self, result: dict):
+        self.cursor.execute(f"INSERT INTO founds VALUES ({result['id']}, '{result['first_name']}', '{result['last_name']}', '{result['profile']}')")
+        self.con.commit()
+
+    def insert_favourite(self, user_id, result_id):
+        self.cursor.execute(f"INSERT INTO favourites VALUES ({user_id}, {result_id})")
+        self.con.commit()
+
+    def insert_dislike(self, user_id, result_id):
+        self.cursor.execute(f"INSERT INTO disliked VALUES ({user_id}, {result_id})")
         self.con.commit()
 
     def query(self, query_text):
@@ -25,30 +48,13 @@ class Postgresql:
         self.con.close()
 
 
-create_table1 = '''CREATE TABLE initiators (id INTEGER PRIMARY KEY, first_name VARCHAR(40), last_name VARCHAR(40),
-                    birthday INTEGER, id_sex INTEGER, city VARCHAR(40));'''
-create_table2 = """CREATE TABLE founds (id INTEGER PRIMARY KEY, first_name VARCHAR(40), last_name VARCHAR(40),
-                    birthday VARCHAR(40), id_sex INTEGER, city VARCHAR(40));"""
-create_table3 = """CREATE TABLE initiators_founds (initiator_id INTEGER REFERENCES initiators(id), 
-                    found_id INTEGER REFERENCES founds(id), 
-                    CONSTRAINT pk2 PRIMARY KEY (initiator_id, found_id));"""
+# db = Postgresql()
+# db.create_tables()
 
-insert_data1 = "INSERT INTO initiators VALUES (13526, 'ramil', 'mamytov', 29, 1, 'Moscow')"
-insert_data2 = "INSERT INTO founds VALUES (22896, 'alfa', 'mamytova', 26, 2, 'Kazan')"
-insert_data3 = "INSERT INTO initiators_founds VALUES (13526, 22896)"
+# db.insert_initiator(125)
+# p = db.query(f"SELECT id FROM initiators WHERE id = 56")
+# print(p)
+select = f"SELECT id, first_name, last_name FROM founds JOIN favourites f ON founds.id = f.found_id WHERE f.initiator_id = 7641579"
 
-a = 13526
-
-query_select = f"SELECT * FROM founds JOIN initiators_founds if ON founds.id = if.found_id WHERE if.initiator_id = {a}"
-
-db = Postgresql()
-
-# db.create_insert(create_table1)
-# db.create_insert(create_table2)
-# db.create_insert(create_table3)
-# db.create_insert(insert_data1)
-# db.create_insert(insert_data2)
-# db.create_insert(insert_data3)
-
-for user in db.query(query_select):
-    print(user)
+# for i in db.query(select):
+#     print(i)
