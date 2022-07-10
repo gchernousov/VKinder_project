@@ -19,6 +19,7 @@ class Server:
         self.vk = vk_api.VkApi(token=api_token)
         self.long_poll = VkBotLongPoll(self.vk, group_id)
         self.vk_api = self.vk.get_api()
+        self.db = Postgresql()
 
     def send_msg(self, user_id: int, message: str, keyboard=None):
         """Отправка сообщения пользователю"""
@@ -69,9 +70,6 @@ class Server:
         """Собираем информацию о пользователе"""
         result = self.vk_api.users.get(user_id=user_id, fields="bdate,city,relation,sex")
         # Получаем информацию о дне рождении, городе, статусе отношений и пол
-        db = Postgresql()
-        if not db.query(f"SELECT id FROM initiators WHERE id = {user_id}"):
-            db.insert_initiator(user_id)
         if "bdate" in result[0]:
             user_birthday = result[0]["bdate"]
             age = self.get_age(user_birthday)
@@ -85,9 +83,10 @@ class Server:
             gender = "не указан"
         else:
             gender = result[0]["sex"]
-
         user_info = {"user_id": user_id, "first_name": result[0]["first_name"], "last_name": result[0]["last_name"],
                      "age": age, "city": city, "gender": gender}
+        if not self.db.query(f"SELECT id FROM initiators WHERE id = {user_id}"):
+            self.db.insert_initiator(user_info)
         return user_info
 
     def get_age(self, birthday: str) -> int:
@@ -211,11 +210,11 @@ class Server:
         # тестовые данные:
         photos = "photo716417153_457239020,photo716417153_457239018,photo716417153_457239019"
         show = True
-        db = Postgresql()
         for result in test_search_results:
-            if not db.query(f"SELECT id FROM founds WHERE id = {result['id']}"):
-                db.insert_found(result)
-                if show == True:
+            if not self.db.query(f"SELECT id FROM founds WHERE id = {result['id']}"):
+                self.db.insert_found(result)
+            if show == True:
+                if not self.db.query(f"SELECT found_id FROM favourites WHERE found_id = {result['id']} and initiator_id = {user_id}") and not self.db.query(f"SELECT found_id FROM disliked WHERE found_id = {result['id']} and initiator_id = {user_id}"):
                     result_msg = f"{result['first_name']} {result['last_name']}\nпрофиль: {result['profile']}"
                     self.delete_buttons(user_id, result_msg)
                     keyboard = self.buttons_like_dislike()
@@ -224,11 +223,11 @@ class Server:
                         if event.type == VkBotEventType.MESSAGE_NEW:
                             user_text = event.object.message['text']
                             if user_text == "LIKE":
-                                db.insert_favourite(user_id, result['id'])
+                                self.db.insert_favourite(user_id, result['id'])
                                 # favorites.append(result)
                                 break
                             elif user_text == "DISLIKE":
-                                db.insert_dislike(user_id, result['id'])
+                                self.db.insert_dislike(user_id, result['id'])
                                 # black_list.append(result)
                                 break
                             elif user_text == "Стоп! Хватит!":
@@ -244,8 +243,8 @@ class Server:
                                 self.send_msg(user_id, favorites_message, kb)
                                 show = False
                                 break
-                else:
-                    break
+            else:
+                break
         # либо список результатов закончился, либо пользователь остановил показ
         # если показ остановлен, т.е. если show False: мы должны обновить базу лайков и дизлайков текущего пользователя
         # если show True, то нужно получить новые (следующий массив) результаты и снова показывать их

@@ -22,7 +22,7 @@ class Postgresql:
 
     def create_tables(self):
         self.cursor.execute("""
-        CREATE TABLE initiators (id INTEGER PRIMARY KEY);
+        CREATE TABLE initiators (id INTEGER PRIMARY KEY, first_name VARCHAR(40), last_name VARCHAR(40));
         CREATE TABLE founds (id INTEGER PRIMARY KEY, first_name VARCHAR(40), last_name VARCHAR(40), profile VARCHAR(40));
         CREATE TABLE favourites (initiator_id INTEGER REFERENCES initiators(id), found_id INTEGER REFERENCES founds(id),
         CONSTRAINT pk2 PRIMARY KEY (initiator_id, found_id));
@@ -31,8 +31,8 @@ class Postgresql:
         """)
         self.con.commit()
 
-    def insert_initiator(self, user_id):
-        self.cursor.execute(f"INSERT INTO initiators VALUES ({user_id})")
+    def insert_initiator(self, user_info):
+        self.cursor.execute(f"INSERT INTO initiators VALUES ({user_info['user_id']}, '{user_info['first_name']}', '{user_info['last_name']}')")
         self.con.commit()
 
     def insert_found(self, result: dict):
@@ -58,11 +58,3 @@ class Postgresql:
 
 # db = Postgresql()
 # db.create_tables()
-
-# db.insert_initiator(125)
-# p = db.query(f"SELECT id FROM initiators WHERE id = 56")
-# print(p)
-select = f"SELECT id, first_name, last_name FROM founds JOIN favourites f ON founds.id = f.found_id WHERE f.initiator_id = 7641579"
-
-# for i in db.query(select):
-#     print(i)
