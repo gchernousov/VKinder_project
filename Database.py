@@ -1,12 +1,20 @@
 import psycopg2
+import configparser
+
+settings = configparser.ConfigParser()
+settings.read("settings.ini")
+
+database = settings['DATABASE_SETTINGS']['database_name']
+user = settings['DATABASE_SETTINGS']['user']
+password = settings['DATABASE_SETTINGS']['password']
 
 
 class Postgresql:
     def __init__(self):
         self.con = psycopg2.connect(
-            database='postgres',
-            user='postgres',
-            password='A84db68d',
+            database=database,
+            user=user,
+            password=password,
             host='localhost',
             port='5432',
         )

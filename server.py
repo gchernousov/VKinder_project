@@ -101,10 +101,10 @@ class Server:
     def analys_user_info(self, user_info: dict) -> bool:
         """Смотрим, указаны ли у пользователя все ключевые поля в профиле"""
         if user_info['age'] == "не указан" or user_info['city'] == "не указан" or user_info['gender'] == "не указан":
-            error_message = f"У вас не указаны некоторые параметры:" \
-                            f"День рождения: {user_info['age']}" \
-                            f"Город: {user_info['city']}" \
-                            f"Пол: {user_info['gender']}" \
+            error_message = f"У вас не указаны некоторые параметры:\n\n" \
+                            f"День рождения: {user_info['age']}\n" \
+                            f"Город: {user_info['city']}\n" \
+                            f"Пол: {user_info['gender']}\n\n" \
                             f"Увы, но без полной информации нельзя будет продолжить поиск."
             self.send_msg(user_info['user_id'], error_message)
             user_info_data = False
