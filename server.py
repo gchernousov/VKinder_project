@@ -21,27 +21,17 @@ class Server:
         self.vk_api = self.vk.get_api()
         self.db = Postgresql()
 
-    def send_msg(self, user_id: int, message: str, keyboard=None):
+    def send_msg(self, user_id: int, message=None, attachment=None, keyboard=None):
         """Отправка сообщения пользователю"""
         if keyboard != None:
-            self.vk_api.messages.send(peer_id=user_id, message=message,
-                                      keyboard=keyboard.get_keyboard(), random_id=randrange(10 ** 7))
+            self.vk_api.messages.send(peer_id=user_id, message=message, attachment=attachment,
+                             keyboard=keyboard.get_keyboard(), random_id=randrange(10 ** 7))
         else:
-            self.vk_api.messages.send(peer_id=user_id, message=message, random_id=randrange(10 ** 7))
-
-    def send_img(self, user_id: int, img: str, keyboard=None):
-        """Отправка фотографий пользователю"""
-        if keyboard != None:
-            self.vk_api.messages.send(peer_id=user_id, attachment=img,
-                                      keyboard=keyboard.get_keyboard(), random_id=randrange(10 ** 7))
-        else:
-            self.vk_api.messages.send(peer_id=user_id, attachment=img, random_id=randrange(10 ** 7))
+            self.vk_api.messages.send(peer_id=user_id, message=message, attachment=attachment, random_id=randrange(10 ** 7))
 
     def delete_buttons(self, user_id: int, message: str):
-        """Убираем кнопки из разговора"""
         kb = {"one_time": True, "buttons": []}
-        self.vk_api.messages.send(peer_id=user_id, message=message,
-                                  keyboard=json.dumps(kb), random_id=randrange(10 ** 7))
+        self.vk_api.messages.send(peer_id=user_id, message=message, keyboard=json.dumps(kb), random_id=randrange(10 ** 7))
 
     def say_hello(self, user_id: int, text_message: str):
         """Ищем приветствие в сообщении. Если оно есть - приветствуем пользователя в ответ"""
@@ -61,7 +51,7 @@ class Server:
         keyboard.add_line()
         keyboard.add_callback_button(label="Понравившиеся", color=VkKeyboardColor.SECONDARY,
                                      payload={"type": "show_favorites"})
-        self.send_msg(user_id, message, keyboard)
+        self.send_msg(user_id, message, None, keyboard)
 
     def get_user_info(self, user_id: int) -> dict:
         """Собираем информацию о пользователе"""
@@ -131,7 +121,7 @@ class Server:
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button(label="Девушку", color=VkKeyboardColor.PRIMARY)
         keyboard.add_button(label="Парня", color=VkKeyboardColor.PRIMARY)
-        self.send_msg(user_id, ask_gender, keyboard)
+        self.send_msg(user_id, ask_gender, None, keyboard)
         for event in self.long_poll.listen():
             if event.type == VkBotEventType.MESSAGE_NEW:
                 user_text = event.object.message['text']
@@ -165,7 +155,7 @@ class Server:
         keyboard.add_line()
         keyboard.add_callback_button(label="Стоп! Я передумал", color=VkKeyboardColor.SECONDARY,
                                      payload={"type": "stop"})
-        self.send_msg(user_info["user_id"], message, keyboard)
+        self.send_msg(user_info["user_id"], message, None, keyboard)
         return search_parameters
 
     def get_new_info_for_search(self, user_id: int) -> dict:
@@ -197,7 +187,20 @@ class Server:
         keyboard.add_line()
         keyboard.add_callback_button(label="Нет, хватит", color=VkKeyboardColor.SECONDARY,
                                      payload={"type": "stop"})
-        self.send_msg(user_id, message, keyboard)
+        self.send_msg(user_id, message, None, keyboard)
+
+    def match(self, user_id, liked_person_id, person_name):
+        if len(self.db.query(f"SELECT * FROM initiators WHERE id = {liked_person_id}")) != 0:
+            if len(self.db.query(f"SELECT * FROM favourites WHERE initiator_id = {liked_person_id} AND found_id = {user_id}")) != 0:
+                # сообщение текущему пользователю о взаимном лайке:
+                alert_message = "Поздравляем!\nЭтот человек тоже лайкнул вас!"
+                alert_photo = "photo-214337223_457239384"
+                self.send_msg(user_id, alert_message, alert_photo)
+                # сообщение другому пользователю о взаимном лайке:
+                request = self.db.query(f"SELECT * FROM initiators WHERE id = {user_id}")
+                message_to_another_user = f"{person_name}, вас лайкнули в ответ!\n" \
+                                          f"{request[0][1]} {request[0][2]}: https://vk.com/id{user_id}"
+                self.send_msg(liked_person_id, message_to_another_user)
 
     def show_results(self, user_id: int, search_result=None):
         """Показываем каждый результат поиска пользователю"""
@@ -206,6 +209,7 @@ class Server:
 
         # тестовые данные:
         photos = "photo716417153_457239020,photo716417153_457239018,photo716417153_457239019"
+
         show = True
         for result in test_search_results:
             if not self.db.query(f"SELECT id FROM founds WHERE id = {result['id']}"):
@@ -213,29 +217,27 @@ class Server:
             if show == True:
                 if not self.db.query(f"SELECT found_id FROM favourites WHERE found_id = {result['id']} and initiator_id = {user_id}") and not self.db.query(f"SELECT found_id FROM disliked WHERE found_id = {result['id']} and initiator_id = {user_id}"):
                     result_msg = f"{result['first_name']} {result['last_name']}\nпрофиль: {result['profile']}"
-                    self.delete_buttons(user_id, result_msg)
                     keyboard = self.buttons_like_dislike()
-                    self.send_img(user_id, photos, keyboard)
+                    self.send_msg(user_id, result_msg, photos, keyboard)
                     for event in self.long_poll.listen():
                         if event.type == VkBotEventType.MESSAGE_NEW:
                             user_text = event.object.message['text']
                             if user_text == "LIKE":
                                 self.db.insert_favourite(user_id, result['id'])
+                                self.match(user_id, result['id'], result['first_name'])
                                 break
                             elif user_text == "DISLIKE":
                                 self.db.insert_dislike(user_id, result['id'])
                                 break
                             elif user_text == "Стоп! Хватит!":
-                                goodbye_msg = "Хорошо, до новых встреч!"
-                                self.delete_buttons(user_id, goodbye_msg)
-                                favorites_message = "Хотите еще раз взглянуть на тех, кто вам понравился?"
+                                goodbye_msg = "Хорошо, понял.\nХотите еще раз взглянуть на тех, кто вам понравился?"
                                 kb = VkKeyboard(one_time=True)
                                 kb.add_callback_button(label="Да", color=VkKeyboardColor.SECONDARY,
                                                        payload={"type": "show_favorites"})
                                 kb.add_line()
                                 kb.add_callback_button(label="Нет", color=VkKeyboardColor.SECONDARY,
                                                        payload={"type": "stop"})
-                                self.send_msg(user_id, favorites_message, kb)
+                                self.send_msg(user_id, goodbye_msg, None, kb)
                                 show = False
                                 break
             else:
