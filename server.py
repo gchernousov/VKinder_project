@@ -97,11 +97,8 @@ class Server:
             user_info_data = True
         return user_info_data
 
-    def ask_age(self, user_id: int) -> int:
-        """Запрашиваем возраст людей, которых будем искать"""
+    def get_age_for_search(self):
         age = None
-        ask_message = "Возраст:"
-        self.delete_buttons(user_id, ask_message)
         for event in self.long_poll.listen():
             if event.type == VkBotEventType.MESSAGE_NEW:
                 user_text = event.object.message['text']
@@ -113,6 +110,20 @@ class Server:
                 if type(age) == int:
                     break
         return age
+
+    def ask_age(self, user_id: int, gender: int) -> tuple:
+        """Запрашиваем возраст людей, которых будем искать"""
+        ask_message_1 = ""
+        if gender == 1:
+            ask_message_1 = "Будем искать девушку от:"
+        elif gender == 2:
+            ask_message_1 = "Будем искать парня от:"
+        self.delete_buttons(user_id, ask_message_1)
+        age_from = self.get_age_for_search()
+        ask_message_2 = "и до:"
+        self.send_msg(user_id, ask_message_2)
+        age_to = self.get_age_for_search()
+        return age_from, age_to
 
     def ask_gender(self, user_id: int) -> int:
         """Запрашиваем пол людей, которых будем искать"""
@@ -163,10 +174,10 @@ class Server:
         message = "Хорошо. Задайте параметры для поиска."
         self.delete_buttons(user_id, message)
         gender = self.ask_gender(user_id)
-        age = self.ask_age(user_id)
+        age_range = self.ask_age(user_id, gender)
         city = self.vk_api.users.get(user_id=user_id, fields="city")
         city_id = city[0]['city']['id']
-        search_parameters = {"age": age, "gender": gender, "city": city_id}
+        search_parameters = {"age_from": age_range[0], "age_to": age_range[1], "gender": gender, "city": city_id}
         return search_parameters
 
     def buttons_like_dislike(self) -> object:
@@ -257,6 +268,8 @@ class Server:
             for person in self.db.query(select):
                 person_info = f"{person[1]} {person[2]}: {person[3]}"
                 self.send_msg(user_id, person_info)
+            hope_message = "Неплохо!\nМожет быть кто-нибудь из этих людей тоже однажды лайкнет вас!"
+            self.send_msg(user_id, hope_message)
 
     def start(self):
         """ОСНОВНАЯ ФУНКЦИЯ:
