@@ -155,7 +155,8 @@ class Server:
             who = "девушку"
             gender = 1
 
-        search_parameters = {"age": user_info['age'], "gender": gender, "city": user_info['city']['id']}
+        search_parameters = {"age_from": user_info['age']-1, "age_to": user_info['age']+1,
+                             "gender": gender, "city": user_info['city']['id']}
 
         message = f"{user_info['first_name']}, будем искать {who} в возрасте {user_info['age']} лет из г. {user_info['city']['title']}, верно?"
         keyboard = VkKeyboard(one_time=True)
@@ -167,6 +168,7 @@ class Server:
         keyboard.add_callback_button(label="Стоп! Я передумал", color=VkKeyboardColor.SECONDARY,
                                      payload={"type": "stop"})
         self.send_msg(user_info["user_id"], message, None, keyboard)
+        print(f">>> ask_user_for_search >>> search parameters: {search_parameters}")
         return search_parameters
 
     def get_new_info_for_search(self, user_id: int) -> dict:
@@ -178,6 +180,7 @@ class Server:
         city = self.vk_api.users.get(user_id=user_id, fields="city")
         city_id = city[0]['city']['id']
         search_parameters = {"age_from": age_range[0], "age_to": age_range[1], "gender": gender, "city": city_id}
+        print(f">>> get_new_info_for_search >>> search parameters: {search_parameters}")
         return search_parameters
 
     def buttons_like_dislike(self) -> object:
@@ -213,13 +216,12 @@ class Server:
                                           f"{request[0][1]} {request[0][2]}: https://vk.com/id{user_id}"
                 self.send_msg(liked_person_id, message_to_another_user)
 
-    def show_results(self, user_id: int, search_result=None):
+    def show_results(self, user_id: int, search_parameters=None):
         """Показываем каждый результат поиска пользователю"""
-        # result будет примерно таким:
-        # result = {"id": id, "first_name": first_name, "last_name": last_name, "profile": link, "photos": photos str}
 
-        # тестовые данные:
         photos = "photo716417153_457239020,photo716417153_457239018,photo716417153_457239019"
+
+        # found_persons = search_people(search_parameters)
 
         show = True
         for result in test_search_results:
@@ -229,6 +231,7 @@ class Server:
                 if not self.db.query(f"SELECT found_id FROM favourites WHERE found_id = {result['id']} and initiator_id = {user_id}") and not self.db.query(f"SELECT found_id FROM disliked WHERE found_id = {result['id']} and initiator_id = {user_id}"):
                     result_msg = f"{result['first_name']} {result['last_name']}\nпрофиль: {result['profile']}"
                     keyboard = self.buttons_like_dislike()
+                    # photos = result['photos']
                     self.send_msg(user_id, result_msg, photos, keyboard)
                     for event in self.long_poll.listen():
                         if event.type == VkBotEventType.MESSAGE_NEW:
@@ -297,16 +300,14 @@ class Server:
                     new_message = "Отлично, погнали!"
                     self.delete_buttons(user_id, new_message)
 
-                    # search_result = vk_search_people(search_parameters)
-                    search_result = None  # убрать, для теста
-                    results_over = self.show_results(user_id, search_result)
+                    search_parameters = None  # убрать, для теста
+                    results_over = self.show_results(user_id, search_parameters)
 
                 elif event.object.payload.get("type") == "get_new_info_for_search":
                     search_parameters = self.get_new_info_for_search(user_id)
 
-                    # search_result = vk_search_people(search_parameters)
-                    search_result = None  # убрать, для теста
-                    results_over = self.show_results(user_id, search_result)
+                    search_parameters = None  # убрать, для теста
+                    results_over = self.show_results(user_id, search_parameters)
 
                 elif event.object.payload.get("type") == "show_favorites":
                     self.show_favorites(user_id)
