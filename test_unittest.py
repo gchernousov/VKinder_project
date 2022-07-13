@@ -63,12 +63,10 @@ class TestFunctions(unittest.TestCase):
     # Формирование диапазона возраста для поиска:
     @patch("server.Server.send_msg")
     @patch("server.Server.delete_buttons")
-    @patch("server.Server.get_age_for_search", return_value=28)
-    @patch("server.Server.get_age_for_search", return_value=26)
-    def test_ask_age(self, func1, func2, del_btn, send_m):
-        age_range = (func1.return_value, func2.return_value)
-        expected_age_range = (26, 28)
-        self.assertEqual(age_range, expected_age_range)
+    @patch("server.Server.get_age_for_search", side_effect=[26, 28])
+    def test_ask_age(self, func, del_btn, send_m):
+        expected_result = (26, 28)
+        self.assertEqual(test_server.ask_age(USER_ID, 1), expected_result)
 
     # Формирование параметров для поиска на основе данных пользователя:
     @patch("server.Server.send_msg")
