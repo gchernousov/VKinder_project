@@ -23,15 +23,17 @@ class Server:
 
     def send_msg(self, user_id: int, message=None, attachment=None, keyboard=None):
         """Отправка сообщения пользователю"""
-        if keyboard != None:
+        if keyboard is not None:
             self.vk_api.messages.send(peer_id=user_id, message=message, attachment=attachment,
-                             keyboard=keyboard.get_keyboard(), random_id=randrange(10 ** 7))
+                                      keyboard=keyboard.get_keyboard(), random_id=randrange(10 ** 7))
         else:
-            self.vk_api.messages.send(peer_id=user_id, message=message, attachment=attachment, random_id=randrange(10 ** 7))
+            self.vk_api.messages.send(peer_id=user_id, message=message, attachment=attachment,
+                                      random_id=randrange(10 ** 7))
 
     def delete_buttons(self, user_id: int, message: str):
         kb = {"one_time": True, "buttons": []}
-        self.vk_api.messages.send(peer_id=user_id, message=message, keyboard=json.dumps(kb), random_id=randrange(10 ** 7))
+        self.vk_api.messages.send(peer_id=user_id, message=message, keyboard=json.dumps(kb),
+                                  random_id=randrange(10 ** 7))
 
     def say_hello(self, user_id: int, text_message: str):
         """Ищем приветствие в сообщении. Если оно есть - приветствуем пользователя в ответ"""
@@ -158,7 +160,8 @@ class Server:
         search_parameters = {"age_from": user_info['age']-1, "age_to": user_info['age']+1,
                              "gender": gender, "city": user_info['city']['id']}
 
-        message = f"{user_info['first_name']}, будем искать {who} в возрасте {user_info['age']} лет из г. {user_info['city']['title']}, верно?"
+        message = f"{user_info['first_name']}, будем искать {who} в возрасте {user_info['age']} лет " \
+                  f"из г. {user_info['city']['title']}, верно?"
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_callback_button(label="Да", color=VkKeyboardColor.PRIMARY,
                                      payload={"type": "start_search"})
@@ -168,7 +171,6 @@ class Server:
         keyboard.add_callback_button(label="Стоп! Я передумал", color=VkKeyboardColor.SECONDARY,
                                      payload={"type": "stop"})
         self.send_msg(user_info["user_id"], message, None, keyboard)
-        print(f">>> ask_user_for_search >>> search parameters: {search_parameters}")
         return search_parameters
 
     def get_new_info_for_search(self, user_id: int) -> dict:
@@ -180,7 +182,6 @@ class Server:
         city = self.vk_api.users.get(user_id=user_id, fields="city")
         city_id = city[0]['city']['id']
         search_parameters = {"age_from": age_range[0], "age_to": age_range[1], "gender": gender, "city": city_id}
-        print(f">>> get_new_info_for_search >>> search parameters: {search_parameters}")
         return search_parameters
 
     def buttons_like_dislike(self) -> object:
@@ -205,7 +206,8 @@ class Server:
 
     def match(self, user_id: int, liked_person_id: int, person_name: str):
         if len(self.db.query(f"SELECT * FROM initiators WHERE id = {liked_person_id}")) != 0:
-            if len(self.db.query(f"SELECT * FROM favourites WHERE initiator_id = {liked_person_id} AND found_id = {user_id}")) != 0:
+            if len(self.db.query(f"SELECT * FROM favourites WHERE initiator_id = {liked_person_id} AND "
+                                 f"found_id = {user_id}")) != 0:
                 # сообщение текущему пользователю о взаимном лайке:
                 alert_message = "Поздравляем!\nЭтот человек тоже лайкнул вас!"
                 alert_photo = "photo-214337223_457239384"
@@ -227,8 +229,12 @@ class Server:
         for result in test_search_results:
             if not self.db.query(f"SELECT id FROM founds WHERE id = {result['id']}"):
                 self.db.insert_found(result)
-            if show == True:
-                if not self.db.query(f"SELECT found_id FROM favourites WHERE found_id = {result['id']} and initiator_id = {user_id}") and not self.db.query(f"SELECT found_id FROM disliked WHERE found_id = {result['id']} and initiator_id = {user_id}"):
+            if show is True:
+                if not self.db.query(
+                        f"SELECT found_id FROM favourites WHERE found_id = {result['id']} and initiator_id = {user_id}"
+                ) and not self.db.query(
+                    f"SELECT found_id FROM disliked WHERE found_id = {result['id']} and initiator_id = {user_id}"
+                ):
                     result_msg = f"{result['first_name']} {result['last_name']}\nпрофиль: {result['profile']}"
                     keyboard = self.buttons_like_dislike()
                     # photos = result['photos']
@@ -256,12 +262,13 @@ class Server:
                                 break
             else:
                 break
-        if show == True:
+        if show is True:
             self.results_over(user_id)
 
     def show_favorites(self, user_id: int):
         """Показываем лайкнутых пользователей"""
-        select = f"SELECT id, first_name, last_name, profile FROM founds JOIN favourites f ON founds.id = f.found_id WHERE f.initiator_id = {user_id}"
+        select = f"SELECT id, first_name, last_name, profile FROM founds " \
+                 f"JOIN favourites f ON founds.id = f.found_id WHERE f.initiator_id = {user_id}"
         if not self.db.query(select):
             message = "Увы, список понравившихся людей пуст.\nМожет быть стоит сначала кого-нибудь найти и посмотреть?"
             self.delete_buttons(user_id, message)
@@ -288,7 +295,7 @@ class Server:
                 if event.object.payload.get("type") == "yes_search":
                     user_info = self.get_user_info(user_id)
                     result = self.analys_user_info(user_info)
-                    if result == False:
+                    if result is False:
                         message = "Пожалуйста, обновите свой профиль и возвращайтесь!"
                         self.send_msg(user_id, message)
                     else:
