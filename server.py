@@ -55,7 +55,7 @@ class Server:
 
     def get_user_info(self, user_id: int) -> dict:
         """Собираем информацию о пользователе"""
-        result = self.vk_api.users.get(user_id=user_id, fields="bdate,city,relation,sex")
+        result = self.vk_api.users.get(user_id=user_id, fields="bdate,city,sex")
         if "bdate" in result[0]:
             user_birthday = result[0]["bdate"]
             age = self.get_age(user_birthday)
@@ -97,7 +97,7 @@ class Server:
             user_info_data = True
         return user_info_data
 
-    def get_age_for_search(self):
+    def get_age_for_search(self) -> int:
         age = None
         for event in self.long_poll.listen():
             if event.type == VkBotEventType.MESSAGE_NEW:
@@ -203,7 +203,7 @@ class Server:
                                      payload={"type": "stop"})
         self.send_msg(user_id, message, None, keyboard)
 
-    def match(self, user_id, liked_person_id, person_name):
+    def match(self, user_id: int, liked_person_id: int, person_name: str):
         if len(self.db.query(f"SELECT * FROM initiators WHERE id = {liked_person_id}")) != 0:
             if len(self.db.query(f"SELECT * FROM favourites WHERE initiator_id = {liked_person_id} AND found_id = {user_id}")) != 0:
                 # сообщение текущему пользователю о взаимном лайке:
