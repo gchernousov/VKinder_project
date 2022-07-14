@@ -11,7 +11,7 @@ vk_session = vk_api.VkApi(token=TOKEN)
 vk = vk_session.get_api()
 now = datetime.datetime.now()
 
-# dataa = {"age_from": 22, "age_to": 32, "gender": 2, "city": 2}
+# dataa = {"age_from": 22, "age_to": 32, "gender": 1, "city": 2}
 
 
 def vk_users_search(data):  # data = vk_user_data(id профиля вк)
@@ -45,17 +45,17 @@ def get_vk_photos(user_id):
 
 def full_info():
     for person in vk_users_search(dataa):
-        photo = get_vk_photos(person['id'])
-        vk_link = URL + str(person['id'])
-        full_view = {'id': person['id'], 'first_name': person['first_name'], 'last_name': person['last_name'],
+        if person['is_closed'] == False:
+            photo = get_vk_photos(person['id'])
+            vk_link = URL + str(person['id'])
+            full_view = {'id': person['id'], 'first_name': person['first_name'], 'last_name': person['last_name'],
                      'profile': vk_link, 'photos': ','.join(photo)}
-        print(full_view)
+            yield full_view
 
 
 # vk_users_search(dataa)
-# print(get_vk_photos("35700604"))
-# full_info()
-
+# print(get_vk_photos(""))
+#full_info()
 # for person in vk_users_search(dataa):
 #   vk_link = URL + str(person['id'])
 #  print(person['id'], person['first_name'], person['last_name'], vk_link)
