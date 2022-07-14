@@ -9,6 +9,7 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
 from test_search_results import test_search_results
+from find_your_half import full_info
 from Database import Postgresql
 
 
@@ -218,7 +219,7 @@ class Server:
                                           f"{request[0][1]} {request[0][2]}: https://vk.com/id{user_id}"
                 self.send_msg(liked_person_id, message_to_another_user)
 
-    def show_results(self, user_id: int, search_parameters=None):
+    def show_results(self, user_id: int, search_parameters):
         """Показываем каждый результат поиска пользователю"""
 
         photos = "photo716417153_457239020,photo716417153_457239018,photo716417153_457239019"
@@ -226,10 +227,10 @@ class Server:
         # found_persons = search_people(search_parameters)
 
         show = True
-        for result in test_search_results:
-            if not self.db.query(f"SELECT id FROM founds WHERE id = {result['id']}"):
-                self.db.insert_found(result)
+        for result in full_info(search_parameters):
             if show is True:
+                if not self.db.query(f"SELECT id FROM founds WHERE id = {result['id']}"):
+                    self.db.insert_found(result)
                 if not self.db.query(
                         f"SELECT found_id FROM favourites WHERE found_id = {result['id']} and initiator_id = {user_id}"
                 ) and not self.db.query(
@@ -237,7 +238,7 @@ class Server:
                 ):
                     result_msg = f"{result['first_name']} {result['last_name']}\nпрофиль: {result['profile']}"
                     keyboard = self.buttons_like_dislike()
-                    # photos = result['photos']
+                    photos = result['photos']
                     self.send_msg(user_id, result_msg, photos, keyboard)
                     for event in self.long_poll.listen():
                         if event.type == VkBotEventType.MESSAGE_NEW:
@@ -306,15 +307,11 @@ class Server:
                 elif event.object.payload.get("type") == "start_search":
                     new_message = "Отлично, погнали!"
                     self.delete_buttons(user_id, new_message)
-
-                    search_parameters = None  # убрать, для теста
-                    results_over = self.show_results(user_id, search_parameters)
+                    self.show_results(user_id, search_parameters)
 
                 elif event.object.payload.get("type") == "get_new_info_for_search":
                     search_parameters = self.get_new_info_for_search(user_id)
-
-                    search_parameters = None  # убрать, для теста
-                    results_over = self.show_results(user_id, search_parameters)
+                    self.show_results(user_id, search_parameters)
 
                 elif event.object.payload.get("type") == "show_favorites":
                     self.show_favorites(user_id)

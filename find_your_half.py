@@ -2,12 +2,13 @@ import vk_api
 from vk_api import VkTools
 import datetime
 from pprint import pprint
-from my_token import TOKEN  # нужно вставить свой модуль с личным токеном вк
+# from my_token import TOKEN  # нужно вставить свой модуль с личным токеном вк
+from config import access_code
 import requests
 
 URL = 'https://vk.com/id'
 
-vk_session = vk_api.VkApi(token=TOKEN)
+vk_session = vk_api.VkApi(token=access_code)
 vk = vk_session.get_api()
 now = datetime.datetime.now()
 
@@ -43,8 +44,8 @@ def get_vk_photos(user_id):
     return [f"photo{sort_list[0][1]}_{sort_list[0][2]}" for ph in sort_list]
 
 
-def full_info():
-    for person in vk_users_search(dataa):
+def full_info(params):
+    for person in vk_users_search(params):
         if person['is_closed'] == False:
             photo = get_vk_photos(person['id'])
             vk_link = URL + str(person['id'])
