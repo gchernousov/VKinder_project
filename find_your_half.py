@@ -5,7 +5,7 @@ from pprint import pprint
 from my_token import TOKEN  # нужно вставить свой модуль с личным токеном вк
 import requests
 
-URL = 'https://vk.com/'
+URL = 'https://vk.com/id'
 
 vk_session = vk_api.VkApi(token=TOKEN)
 vk = vk_session.get_api()
@@ -23,6 +23,9 @@ def vk_user_data(id_user):
     return my_info_dict
 
 
+# dataa = {'first_name': 'Игорь', 'last_name': 'Грефенштейн', 'sex': 2, 'year': '1997', 'city': 49}   -- тестовый словарь для бота
+
+
 def vk_users_search(data):  # data = vk_user_data(id профиля вк)
     """Ф-ия по параметрам пользователя из ф-ии vk_user_data подбирает половинку пользователю."""
     city = data['city']
@@ -32,10 +35,10 @@ def vk_users_search(data):  # data = vk_user_data(id профиля вк)
     age_to = age + 5
     peoples = VkTools(vk).get_all_iter(  # Модуль для выкачивания множества результатов.
         method='users.search',
-        max_count=1,
+        max_count=1000,
         key='items',
-        values={'is_closed': False, 'fields': 'bdate, screen_name', 'hometown': city, 'sex': sex, 'age_from': age_from,
-                'age_to': age_to, 'has_photo': 1, 'status': 6
+        values={'is_closed': False, 'sex': sex, 'city': city, 'age_from': age_from,
+                'age_to': age_to, 'has_photo': 1
 
                 }
     )
@@ -50,19 +53,23 @@ def get_vk_photos(user_id):
     })
     info_list_photo = []
     for photo in res['items']:
-        #pprint(photo)
         likes = photo['likes']['count']
-        info_list_photo.append([likes, photo['id'], photo['sizes'][-1]['url']])
+        info_list_photo.append([likes, photo['owner_id'], photo['id'], photo['sizes'][-1]['url']])
     sort_list = sorted(info_list_photo)[-3:]
-    return sort_list
+    return [f"photo{sort_list[0][1]}_{sort_list[0][2]}" for ph in sort_list]
 
 
-# print(vk_user_data())
-#vk_users_search()
-print(get_vk_photos("35700604"))
+def full_info():
+    for person in vk_users_search(dataa):
+        photo = get_vk_photos(person['id'])
+        vk_link = URL + str(person['id'])
+        full_view = {'id': person['id'], 'first_name': person['first_name'], 'last_name': person['last_name'], 'profile': vk_link, 'photos': ','.join(photo)}
+        print(full_view)
 
-# doto = vk_users_search()
-# for i in doto:
-#    link = URL + i['screen_name']
-#    need_info = i['id'], i['first_name'], i['last_name'], link
-#     print(need_info[2])
+# vk_users_search(dataa)
+# print(get_vk_photos("35700604"))
+full_info()
+
+# for person in vk_users_search(dataa):
+#   vk_link = URL + str(person['id'])
+#  print(person['id'], person['first_name'], person['last_name'], vk_link)
