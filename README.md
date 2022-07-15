@@ -1,6 +1,6 @@
 #VKinder
 
-https://sun9-88.userapi.com/impg/pVg2kxBTe5ojvSHctTJY7M_PVbc-KvPVu5pL2g/9WrCCXEvxyg.jpg?size=757x486&quality=95&sign=9a096712994e3ee570d468eb98419364&type=album
+![9WrCCXEvxyg](https://user-images.githubusercontent.com/100129717/179293274-18206c68-693f-4c6c-8e25-6106a970e9b0.jpg)
 
 
 ## Техническое описание проекта
@@ -61,4 +61,8 @@ https://sun9-88.userapi.com/impg/pVg2kxBTe5ojvSHctTJY7M_PVbc-KvPVu5pL2g/9WrCCXEv
 В социальной сети "ВКонтакте" создать сообщество и занести в файл "settings.ini" токен, id-группы и access code.
 
 ## Пример общения с чат-ботом
+![1](https://user-images.githubusercontent.com/100129717/179293347-7123046b-e7e7-406d-a8ff-a148b55e455c.png)
 
+![2](https://user-images.githubusercontent.com/100129717/179293358-771ed772-3209-46d2-9ce8-c2a1ec4bdadc.png)
+
+![3](https://user-images.githubusercontent.com/100129717/179293361-b74ff9d7-d4cf-43de-9bf0-4f1a3b1bcf6d.png)
