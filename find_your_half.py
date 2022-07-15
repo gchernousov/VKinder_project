@@ -1,62 +1,43 @@
 import vk_api
 from vk_api import VkTools
-import datetime
-from pprint import pprint
-# from my_token import TOKEN  # нужно вставить свой модуль с личным токеном вк
-from config import access_code
-import requests
 
-URL = 'https://vk.com/id'
+from config import access_code
 
 vk_session = vk_api.VkApi(token=access_code)
 vk = vk_session.get_api()
-now = datetime.datetime.now()
-
-# dataa = {"age_from": 22, "age_to": 32, "gender": 1, "city": 2}
 
 
-def vk_users_search(data):  # data = vk_user_data(id профиля вк)
+def users_search(search_params):
     """Ф-ия по параметрам пользователя из ф-ии vk_user_data подбирает половинку пользователю."""
-    city = data['city']
     peoples = VkTools(vk).get_all_iter(  # Модуль для выкачивания множества результатов.
         method='users.search',
         max_count=1000,
         key='items',
-        values={'is_closed': False, 'sex': data['gender'], 'city': city, 'age_from': data['age_from'],
-                'age_to': data['age_to'], 'has_photo': 1, 'status': 6
-
-                }
+        values={'sex': search_params['gender'], 'city': search_params['city'],
+                'age_from': search_params['age_from'], 'age_to': search_params['age_to'],
+                'has_photo': 1, 'status': 6}
     )
     return peoples
 
 
-def get_vk_photos(user_id):
-    res = vk_session.method('photos.get', {
-        'album_id': 'profile',
-        'extended': 1,
-        'owner_id': user_id
-    })
-    info_list_photo = []
-    for photo in res['items']:
+def get_user_photos(user_id):
+    user_photos = vk.photos.get(album_id="profile", extended=1, owner_id=user_id)
+    most_popular_photos = []
+    for photo in user_photos['items']:
         likes = photo['likes']['count']
-        info_list_photo.append([likes, photo['owner_id'], photo['id'], photo['sizes'][-1]['url']])
-    sort_list = sorted(info_list_photo)[-3:]
-    return [f"photo{sort_list[0][1]}_{sort_list[0][2]}" for ph in sort_list]
+        most_popular_photos.append([likes, photo['id']])
+    most_popular_photos = sorted(most_popular_photos)[-3:]
+    result = [f"photo{user_id}_{photo[1]}" for photo in most_popular_photos]
+    result = ','.join(result)
+    return result
 
 
-def full_info(params):
-    for person in vk_users_search(params):
+def search_people(search_params):
+    url = 'https://vk.com/id'
+    for person in users_search(search_params):
         if person['is_closed'] == False:
-            photo = get_vk_photos(person['id'])
-            vk_link = URL + str(person['id'])
-            full_view = {'id': person['id'], 'first_name': person['first_name'], 'last_name': person['last_name'],
-                     'profile': vk_link, 'photos': ','.join(photo)}
-            yield full_view
-
-
-# vk_users_search(dataa)
-# print(get_vk_photos(""))
-#full_info()
-# for person in vk_users_search(dataa):
-#   vk_link = URL + str(person['id'])
-#  print(person['id'], person['first_name'], person['last_name'], vk_link)
+            photos = get_user_photos(person['id'])
+            vk_link = url + str(person['id'])
+            full_info = {'id': person['id'], 'first_name': person['first_name'], 'last_name': person['last_name'],
+                     'profile': vk_link, 'photos': photos}
+            yield full_info

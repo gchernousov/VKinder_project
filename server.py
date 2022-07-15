@@ -1,16 +1,14 @@
-from random import randrange
-from pprint import pprint as pp
-import re
-import json
-import datetime
-
 import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
-from test_search_results import test_search_results
-from find_your_half import full_info
+from find_your_half import search_people
 from Database import Postgresql
+
+from random import randrange
+import re
+import json
+import datetime
 
 
 class Server:
@@ -221,13 +219,8 @@ class Server:
 
     def show_results(self, user_id: int, search_parameters):
         """Показываем каждый результат поиска пользователю"""
-
-        photos = "photo716417153_457239020,photo716417153_457239018,photo716417153_457239019"
-
-        # found_persons = search_people(search_parameters)
-
         show = True
-        for result in full_info(search_parameters):
+        for result in search_people(search_parameters):
             if show is True:
                 if not self.db.query(f"SELECT id FROM founds WHERE id = {result['id']}"):
                     self.db.insert_found(result)
