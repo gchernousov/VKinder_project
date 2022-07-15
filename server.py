@@ -2,8 +2,8 @@ import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
-from find_your_half import search_people
-from Database import Postgresql
+from search_people import search_people
+from sql_database import Postgresql
 
 from random import randrange
 import re
@@ -84,7 +84,7 @@ class Server:
         age = int((current_date - birthday).days / 365)
         return age
 
-    def analys_user_info(self, user_info: dict) -> bool:
+    def analysis_user_info(self, user_info: dict) -> bool:
         """Смотрим, указаны ли у пользователя все ключевые поля в профиле"""
         if user_info['age'] == "не указан" or user_info['city'] == "не указан" or user_info['gender'] == "не указан":
             error_message = f"У вас не указаны некоторые параметры:\n\n" \
@@ -269,15 +269,18 @@ class Server:
         else:
             message = "Понравившиеся:"
             self.delete_buttons(user_id, message)
+            favorites_message = ""
             for person in self.db.query(select):
-                person_info = f"{person[1]} {person[2]}: {person[3]}"
-                self.send_msg(user_id, person_info)
+                person_info = f"{person[1]} {person[2]}: {person[3]}\n"
+                favorites_message += person_info
+            self.send_msg(user_id, favorites_message)
             hope_message = "Неплохо!\nМожет быть кто-нибудь из этих людей тоже однажды лайкнет вас!"
             self.send_msg(user_id, hope_message)
 
     def start(self):
         """ОСНОВНАЯ ФУНКЦИЯ:
         Отслеживаем события в чате, общаемся с пользователем"""
+        search_parameters = {}
         for event in self.long_poll.listen():
             if event.type == VkBotEventType.MESSAGE_NEW:
                 user_id = event.object.message['from_id']
@@ -288,7 +291,7 @@ class Server:
                 user_id = event.object['user_id']
                 if event.object.payload.get("type") == "yes_search":
                     user_info = self.get_user_info(user_id)
-                    result = self.analys_user_info(user_info)
+                    result = self.analysis_user_info(user_info)
                     if result is False:
                         message = "Пожалуйста, обновите свой профиль и возвращайтесь!"
                         self.send_msg(user_id, message)
@@ -301,10 +304,8 @@ class Server:
                     new_message = "Отлично, погнали!"
                     self.delete_buttons(user_id, new_message)
                     self.show_results(user_id, search_parameters)
-
                 elif event.object.payload.get("type") == "get_new_info_for_search":
                     search_parameters = self.get_new_info_for_search(user_id)
                     self.show_results(user_id, search_parameters)
-
                 elif event.object.payload.get("type") == "show_favorites":
                     self.show_favorites(user_id)

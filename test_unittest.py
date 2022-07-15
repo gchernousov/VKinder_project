@@ -3,18 +3,25 @@ from unittest.mock import patch, MagicMock
 from parameterized import parameterized
 
 import vk_api
+from server import Server
 from random import randrange
 
-from server import Server
-from config import token, group_id
+import configparser
 
-test_server = Server(token, group_id, "test server")
-vk_session = vk_api.VkApi(token=token)
+settings = configparser.ConfigParser()
+settings.read("settings.ini")
+
+group_token = settings['VK_TOKENS']['group_token']
+group_id = settings['VK_TOKENS']['group_id']
+
+test_server = Server(group_token, group_id, "test server")
+vk_session = vk_api.VkApi(token=group_token)
 vk = vk_session.get_api()
 
-USER_ID = 716417153
+# ID профиля vk для теста:
+USER_ID = 123456789
 
-class TestFunctions(unittest.TestCase):
+class TestServerBot(unittest.TestCase):
 
     def setUp(self) -> None:
         print(">>> setUp")
@@ -39,7 +46,7 @@ class TestFunctions(unittest.TestCase):
     # Получение информации о пользователе:
     def test_get_user_info(self):
         expected_result = {"user_id": 716417153, "first_name": "Георгий", "last_name": "Черноусов",
-                  "age": 32, "city": {'id': 49, 'title': 'Екатеринбург'}, "gender": 2}
+                           "age": 32, "city": {'id': 49, 'title': 'Екатеринбург'}, "gender": 2}
         self.assertEqual(test_server.get_user_info(716417153), expected_result)
 
     # Вычисление возраста из даты рождения:
@@ -57,8 +64,8 @@ class TestFunctions(unittest.TestCase):
         ]
     )
     @patch("server.Server.send_msg")
-    def test_analys_user_info(self, user_info, result, send_msg):
-        self.assertEqual(test_server.analys_user_info(user_info), result)
+    def test_analysis_user_info(self, user_info, result, send_msg):
+        self.assertEqual(test_server.analysis_user_info(user_info), result)
 
     # Формирование диапазона возраста для поиска:
     @patch("server.Server.send_msg")
@@ -81,4 +88,5 @@ class TestFunctions(unittest.TestCase):
     @patch("server.Server.ask_age", return_value=(26, 29))
     @patch("server.Server.ask_gender", return_value=1)
     def test_get_new_info_for_search(self, get_gender, get_age_range, del_btns):
-        self.assertEqual(test_server.get_new_info_for_search(USER_ID), {"age_from": 26, "age_to": 29, "gender": 1, "city": 49})
+        self.assertEqual(test_server.get_new_info_for_search(USER_ID), {"age_from": 26, "age_to": 29,
+                                                                        "gender": 1, "city": 49})
