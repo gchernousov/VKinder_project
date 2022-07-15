@@ -88,7 +88,7 @@ class Server:
         """Смотрим, указаны ли у пользователя все ключевые поля в профиле"""
         if user_info['age'] == "не указан" or user_info['city'] == "не указан" or user_info['gender'] == "не указан":
             error_message = f"У вас не указаны некоторые параметры:\n\n" \
-                            f"День рождения: {user_info['age']}\n" \
+                            f"Возраст: {user_info['age']}\n" \
                             f"Город: {user_info['city']}\n" \
                             f"Пол: {user_info['gender']}\n\n" \
                             f"Увы, но без полной информации нельзя будет продолжить поиск."
@@ -156,7 +156,7 @@ class Server:
             who = "девушку"
             gender = 1
 
-        search_parameters = {"age_from": user_info['age']-1, "age_to": user_info['age']+1,
+        search_parameters = {"age_from": user_info['age']-1, "age_to": user_info['age'],
                              "gender": gender, "city": user_info['city']['id']}
 
         message = f"{user_info['first_name']}, будем искать {who} в возрасте {user_info['age']} лет " \
