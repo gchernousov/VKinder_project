@@ -52,6 +52,38 @@ class Postgresql:
         result = self.cursor.fetchall()
         return result
 
+    def check_user_in_initiators(self, user_id):
+        if not self.query(f"SELECT id FROM initiators WHERE id = {user_id}"):
+            self.insert_initiator(user_info)
+
+    def check_users_for_match(self, user_id, liked_person_id):
+        match = False
+        if len(self.query(f"SELECT * FROM initiators WHERE id = {liked_person_id}")) != 0:
+            if len(self.query(f"SELECT * FROM favourites WHERE initiator_id = {liked_person_id} AND "
+                              f"found_id = {user_id}")) != 0:
+                match = True
+        return match
+
+    def check_user_in_founds(self, founded_person):
+        if not self.query(f"SELECT id FROM founds WHERE id = {founded_person['id']}"):
+            self.insert_found(founded_person)
+
+    def check_like_dislike(self, user_id, founded_person):
+        evaluate = False
+        if not self.query(
+                f"SELECT found_id FROM favourites WHERE found_id = {founded_person['id']} and initiator_id = {user_id}"
+        ) and not self.query(
+            f"SELECT found_id FROM disliked WHERE found_id = {founded_person['id']} and initiator_id = {user_id}"
+        ):
+            evaluate = True
+        return evaluate
+
+    def show_all_favorites(self, user_id):
+        select = f"SELECT id, first_name, last_name, profile FROM founds " \
+                 f"JOIN favourites f ON founds.id = f.found_id WHERE f.initiator_id = {user_id}"
+        favorites = self.query(select)
+        return favorites
+
     def __del__(self):
         self.con.close()
 

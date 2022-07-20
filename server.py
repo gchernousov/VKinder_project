@@ -2,13 +2,12 @@ import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
-from search_people import search_people
+from search_people import search_people, get_user_info
 from sql_database import Postgresql
 
 from random import randrange
 import re
 import json
-import datetime
 
 
 class Server:
@@ -54,36 +53,6 @@ class Server:
                                      payload={"type": "show_favorites"})
         self.send_msg(user_id, message, None, keyboard)
 
-    def get_user_info(self, user_id: int) -> dict:
-        """Собираем информацию о пользователе"""
-        result = self.vk_api.users.get(user_id=user_id, fields="bdate,city,sex")
-        if "bdate" in result[0]:
-            user_birthday = result[0]["bdate"]
-            age = self.get_age(user_birthday)
-        else:
-            age = "не указан"
-        if "city" in result[0]:
-            city = result[0]["city"]  # city - словарь, где ключи id и title
-        else:
-            city = "не указан"
-        if result[0]["sex"] == 0:
-            gender = "не указан"
-        else:
-            gender = result[0]["sex"]
-        user_info = {"user_id": user_id, "first_name": result[0]["first_name"], "last_name": result[0]["last_name"],
-                     "age": age, "city": city, "gender": gender}
-        if not self.db.query(f"SELECT id FROM initiators WHERE id = {user_id}"):
-            self.db.insert_initiator(user_info)
-        return user_info
-
-    def get_age(self, birthday: str) -> int:
-        """Вычисляем возраст пользователя"""
-        current_date = datetime.date.today()
-        birthday = birthday.split(".")
-        birthday = datetime.date(year=int(birthday[2]), month=int(birthday[1]), day=int(birthday[0]))
-        age = int((current_date - birthday).days / 365)
-        return age
-
     def analysis_user_info(self, user_info: dict) -> bool:
         """Смотрим, указаны ли у пользователя все ключевые поля в профиле"""
         if user_info['age'] == "не указан" or user_info['city'] == "не указан" or user_info['gender'] == "не указан":
@@ -91,7 +60,7 @@ class Server:
                             f"Возраст: {user_info['age']}\n" \
                             f"Город: {user_info['city']}\n" \
                             f"Пол: {user_info['gender']}\n\n" \
-                            f"Увы, но без полной информации нельзя будет продолжить поиск."
+                            f"Увы, но без полной информации нельзя будет продолжить поиск!"
             self.send_msg(user_info['user_id'], error_message)
             user_info_data = False
         else:
@@ -114,11 +83,7 @@ class Server:
 
     def ask_age(self, user_id: int, gender: int) -> tuple:
         """Запрашиваем возраст людей, которых будем искать"""
-        ask_message_1 = ""
-        if gender == 1:
-            ask_message_1 = "Будем искать девушку от:"
-        elif gender == 2:
-            ask_message_1 = "Будем искать парня от:"
+        ask_message_1 = "Будем искать девушку от:" if gender == 1 else "Будем искать парня от:"
         self.delete_buttons(user_id, ask_message_1)
         age_from = self.get_age_for_search()
         ask_message_2 = "и до:"
@@ -147,14 +112,8 @@ class Server:
 
     def ask_user_for_search(self, user_info: dict) -> dict:
         """Спрашиваем, верны ли данные для поиска"""
-        who = ""
-        gender = 0
-        if user_info["gender"] == 1:
-            who = "парня"
-            gender = 2
-        elif user_info["gender"] == 2:
-            who = "девушку"
-            gender = 1
+        who = "парня" if user_info["gender"] == 1 else "девушку"
+        gender = 2 if user_info["gender"] == 1 else 1
 
         search_parameters = {"age_from": user_info['age']-1, "age_to": user_info['age'],
                              "gender": gender, "city": user_info['city']['id']}
@@ -204,31 +163,27 @@ class Server:
         self.send_msg(user_id, message, None, keyboard)
 
     def match(self, user_id: int, liked_person_id: int, person_name: str):
-        if len(self.db.query(f"SELECT * FROM initiators WHERE id = {liked_person_id}")) != 0:
-            if len(self.db.query(f"SELECT * FROM favourites WHERE initiator_id = {liked_person_id} AND "
-                                 f"found_id = {user_id}")) != 0:
-                # сообщение текущему пользователю о взаимном лайке:
-                alert_message = "Поздравляем!\nЭтот человек тоже лайкнул вас!"
-                alert_photo = "photo-214337223_457239384"
-                self.send_msg(user_id, alert_message, alert_photo)
-                # сообщение другому пользователю о взаимном лайке:
-                request = self.db.query(f"SELECT * FROM initiators WHERE id = {user_id}")
-                message_to_another_user = f"{person_name}, вас лайкнули в ответ!\n" \
-                                          f"{request[0][1]} {request[0][2]}: https://vk.com/id{user_id}"
-                self.send_msg(liked_person_id, message_to_another_user)
+        """Проверка на взаимный лайк двух пользователей"""
+        match = self.db.check_users_for_match(user_id, liked_person_id)
+        if match:
+            # сообщение текущему пользователю о взаимном лайке:
+            alert_message = "Поздравляем!\nЭтот человек тоже лайкнул вас!"
+            alert_photo = "photo-214337223_457239384"
+            self.send_msg(user_id, alert_message, alert_photo)
+            # сообщение другому пользователю о взаимном лайке:
+            result = get_user_info(user_id)
+            message_to_another_user = f"{person_name}, вас лайкнули в ответ!\n"\
+                                      f"{result['first_name']} {result['last_name']}: https://vk.com/id{user_id}"
+            self.send_msg(liked_person_id, message_to_another_user)
 
-    def show_results(self, user_id: int, search_parameters):
+    def show_results(self, user_id: int, search_parameters: dict):
         """Показываем каждый результат поиска пользователю"""
         show = True
         for result in search_people(search_parameters):
-            if show is True:
-                if not self.db.query(f"SELECT id FROM founds WHERE id = {result['id']}"):
-                    self.db.insert_found(result)
-                if not self.db.query(
-                        f"SELECT found_id FROM favourites WHERE found_id = {result['id']} and initiator_id = {user_id}"
-                ) and not self.db.query(
-                    f"SELECT found_id FROM disliked WHERE found_id = {result['id']} and initiator_id = {user_id}"
-                ):
+            if show:
+                self.db.check_user_in_founds(result)
+                evaluate = self.db.check_like_dislike(user_id, result)
+                if evaluate:
                     result_msg = f"{result['first_name']} {result['last_name']}\nпрофиль: {result['profile']}"
                     keyboard = self.buttons_like_dislike()
                     photos = result['photos']
@@ -256,21 +211,20 @@ class Server:
                                 break
             else:
                 break
-        if show is True:
+        if show:
             self.results_over(user_id)
 
     def show_favorites(self, user_id: int):
         """Показываем лайкнутых пользователей"""
-        select = f"SELECT id, first_name, last_name, profile FROM founds " \
-                 f"JOIN favourites f ON founds.id = f.found_id WHERE f.initiator_id = {user_id}"
-        if not self.db.query(select):
+        favorites = self.db.show_all_favorites(user_id)
+        if not favorites:
             message = "Увы, список понравившихся людей пуст.\nМожет быть стоит сначала кого-нибудь найти и посмотреть?"
             self.delete_buttons(user_id, message)
         else:
             message = "Понравившиеся:"
             self.delete_buttons(user_id, message)
             favorites_message = ""
-            for person in self.db.query(select):
+            for person in favorites:
                 person_info = f"{person[1]} {person[2]}: {person[3]}\n"
                 favorites_message += person_info
             self.send_msg(user_id, favorites_message)
@@ -290,7 +244,7 @@ class Server:
             elif event.type == VkBotEventType.MESSAGE_EVENT:
                 user_id = event.object['user_id']
                 if event.object.payload.get("type") == "yes_search":
-                    user_info = self.get_user_info(user_id)
+                    user_info = get_user_info(user_id)
                     result = self.analysis_user_info(user_info)
                     if result is False:
                         message = "Пожалуйста, обновите свой профиль и возвращайтесь!"

@@ -4,6 +4,8 @@ from parameterized import parameterized
 
 import vk_api
 from server import Server
+from search_people import get_user_info, get_age
+
 from random import randrange
 
 import configparser
@@ -47,12 +49,12 @@ class TestServerBot(unittest.TestCase):
     def test_get_user_info(self):
         expected_result = {"user_id": 716417153, "first_name": "Георгий", "last_name": "Черноусов",
                            "age": 32, "city": {'id': 49, 'title': 'Екатеринбург'}, "gender": 2}
-        self.assertEqual(test_server.get_user_info(716417153), expected_result)
+        self.assertEqual(get_user_info(716417153), expected_result)
 
     # Вычисление возраста из даты рождения:
     def test_get_age(self):
         birthday = "28.12.1989"
-        self.assertEqual(test_server.get_age(birthday), 32)
+        self.assertEqual(get_age(birthday), 32)
 
     # Проверка валидности информации о пользователе:
     @parameterized.expand(
@@ -78,9 +80,9 @@ class TestServerBot(unittest.TestCase):
     # Формирование параметров для поиска на основе данных пользователя:
     @patch("server.Server.send_msg")
     def test_ask_user_for_search(self, send_msg):
-        test_user_info = {"user_id": 123456789, "first_name": "Имя", "last_name": "Фамилия",
+        test_user_info = {"user_id": USER_ID, "first_name": "Имя", "last_name": "Фамилия",
                           "age": 30, "city": {'id': 1, 'title': 'Москва'}, "gender": 2}
-        expected_search_parameters = {"age_from": 29, "age_to": 31, "gender": 1, "city": 1}
+        expected_search_parameters = {"age_from": 29, "age_to": 30, "gender": 1, "city": 1}
         self.assertEqual(test_server.ask_user_for_search(test_user_info), expected_search_parameters)
 
     # Формирование новой информации для поиска:

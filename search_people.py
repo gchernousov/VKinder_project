@@ -1,17 +1,47 @@
 import vk_api
 from vk_api import VkTools
+from sql_database import Postgresql
 
+import datetime
 import configparser
 
 settings = configparser.ConfigParser()
 settings.read("settings.ini")
 access_token = settings['VK_TOKENS']['access_token']
 
+db = Postgresql()
+
 vk_session = vk_api.VkApi(token=access_token)
 vk = vk_session.get_api()
 
 
-def users_search(search_params, month):
+def get_user_info(user_id: int) -> dict:
+    """Собираем информацию о пользователе"""
+    result = vk.users.get(user_id=user_id, fields="bdate,city,sex")
+    if "bdate" in result[0]:
+        user_birthday = result[0]["bdate"]
+        age = get_age(user_birthday)
+    else:
+        age = "не указан"
+    # city - словарь, где ключи id города и title города
+    city = result[0]["city"] if "city" in result[0] else "не указан"
+    gender = "не указан" if result[0]["sex"] == 0 else result[0]["sex"]
+    user_info = {"user_id": user_id, "first_name": result[0]["first_name"], "last_name": result[0]["last_name"],
+                 "age": age, "city": city, "gender": gender}
+    db.check_user_in_initiators(user_id)
+    return user_info
+
+
+def get_age(birthday: str) -> int:
+    """Вычисляем возраст пользователя"""
+    current_date = datetime.date.today()
+    birthday = birthday.split(".")
+    birthday = datetime.date(year=int(birthday[2]), month=int(birthday[1]), day=int(birthday[0]))
+    age = int((current_date - birthday).days / 365)
+    return age
+
+
+def users_search(search_params: dict, month: int):
     """Поиск пользователей VK по заданным параметрам"""
     peoples = VkTools(vk).get_all_iter(  # Модуль для выкачивания множества результатов.
         method='users.search',
@@ -24,7 +54,7 @@ def users_search(search_params, month):
     return peoples
 
 
-def get_user_photos(user_id):
+def get_user_photos(user_id: int):
     """Поиск трех самых популярных фотографий из профиля пользователя"""
     user_photos = vk.photos.get(album_id="profile", extended=1, owner_id=user_id)
     most_popular_photos = []
@@ -37,7 +67,7 @@ def get_user_photos(user_id):
     return result
 
 
-def search_people(search_params):
+def search_people(search_params: dict):
     """Выдача результатов поиска"""
     month = 1
     url = 'https://vk.com/id'
