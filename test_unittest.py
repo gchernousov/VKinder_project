@@ -4,7 +4,7 @@ from parameterized import parameterized
 
 import vk_api
 from server import Server
-from search_people import get_user_info, get_age
+from search_people import get_user_info, get_age, analysis_user_info
 
 from random import randrange
 
@@ -65,9 +65,8 @@ class TestServerBot(unittest.TestCase):
               "age": 30, "city": "не указан", "gender": 2}, False)
         ]
     )
-    @patch("server.Server.send_msg")
-    def test_analysis_user_info(self, user_info, result, send_msg):
-        self.assertEqual(test_server.analysis_user_info(user_info), result)
+    def test_analysis_user_info(self, user_info, result):
+        self.assertEqual(analysis_user_info(user_info), result)
 
     # Формирование диапазона возраста для поиска:
     @patch("server.Server.send_msg")

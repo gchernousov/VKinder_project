@@ -2,7 +2,7 @@ import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
-from search_people import search_people, get_user_info
+from search_people import search_people, get_user_info, analysis_user_info
 from sql_database import Postgresql
 
 from random import randrange
@@ -53,20 +53,6 @@ class Server:
                                      payload={"type": "show_favorites"})
         self.send_msg(user_id, message, None, keyboard)
 
-    def analysis_user_info(self, user_info: dict) -> bool:
-        """Смотрим, указаны ли у пользователя все ключевые поля в профиле"""
-        if user_info['age'] == "не указан" or user_info['city'] == "не указан" or user_info['gender'] == "не указан":
-            error_message = f"У вас не указаны некоторые параметры:\n\n" \
-                            f"Возраст: {user_info['age']}\n" \
-                            f"Город: {user_info['city']}\n" \
-                            f"Пол: {user_info['gender']}\n\n" \
-                            f"Увы, но без полной информации нельзя будет продолжить поиск!"
-            self.send_msg(user_info['user_id'], error_message)
-            user_info_data = False
-        else:
-            user_info_data = True
-        return user_info_data
-
     def get_age_for_search(self) -> int:
         age = None
         for event in self.long_poll.listen():
@@ -102,12 +88,8 @@ class Server:
         for event in self.long_poll.listen():
             if event.type == VkBotEventType.MESSAGE_NEW:
                 user_text = event.object.message['text']
-                if user_text == "Девушку":
-                    gender = 1
-                    break
-                elif user_text == "Парня":
-                    gender = 2
-                    break
+                gender = 1 if user_text == "Девушку" else 2
+                break
         return gender
 
     def ask_user_for_search(self, user_info: dict) -> dict:
@@ -245,10 +227,15 @@ class Server:
                 user_id = event.object['user_id']
                 if event.object.payload.get("type") == "yes_search":
                     user_info = get_user_info(user_id)
-                    result = self.analysis_user_info(user_info)
+                    result = analysis_user_info(user_info)
                     if result is False:
-                        message = "Пожалуйста, обновите свой профиль и возвращайтесь!"
-                        self.send_msg(user_id, message)
+                        error_message = f"У вас не указаны некоторые параметры:\n\n" \
+                                        f"Возраст: {user_info['age']}\n" \
+                                        f"Город: {user_info['city']}\n" \
+                                        f"Пол: {user_info['gender']}\n\n" \
+                                        f"Увы, но без полной информации нельзя будет продолжить поиск!\n"\
+                                        f"Пожалуйста, обновите свой профиль и возвращайтесь!"
+                        self.send_msg(user_id, error_message)
                     else:
                         search_parameters = self.ask_user_for_search(user_info)
                 elif event.object.payload.get("type") == "stop":

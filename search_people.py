@@ -41,6 +41,15 @@ def get_age(birthday: str) -> int:
     return age
 
 
+def analysis_user_info(user_info: dict) -> bool:
+    """Смотрим, указаны ли у пользователя все ключевые поля в профиле"""
+    if user_info['age'] == "не указан" or user_info['city'] == "не указан" or user_info['gender'] == "не указан":
+        user_info_data = False
+    else:
+        user_info_data = True
+    return user_info_data
+
+
 def users_search(search_params: dict, month: int):
     """Поиск пользователей VK по заданным параметрам"""
     peoples = VkTools(vk).get_all_iter(  # Модуль для выкачивания множества результатов.
