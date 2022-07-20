@@ -228,7 +228,9 @@ class Server:
                 if event.object.payload.get("type") == "yes_search":
                     user_info = get_user_info(user_id)
                     result = analysis_user_info(user_info)
-                    if result is False:
+                    if result:
+                        search_parameters = self.ask_user_for_search(user_info)
+                    else:
                         error_message = f"У вас не указаны некоторые параметры:\n\n" \
                                         f"Возраст: {user_info['age']}\n" \
                                         f"Город: {user_info['city']}\n" \
@@ -236,8 +238,6 @@ class Server:
                                         f"Увы, но без полной информации нельзя будет продолжить поиск!\n"\
                                         f"Пожалуйста, обновите свой профиль и возвращайтесь!"
                         self.send_msg(user_id, error_message)
-                    else:
-                        search_parameters = self.ask_user_for_search(user_info)
                 elif event.object.payload.get("type") == "stop":
                     new_message = "Нет, так нет. До скорой встречи!"
                     self.delete_buttons(user_id, new_message)
